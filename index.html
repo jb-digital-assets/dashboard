@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JB 디지털자산부 뉴스 대시보드</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F8FAFC; color: #1E293B; font-family: 'IBM Plex Mono', monospace; }
+
+    /* HEADER */
+    #header {
+      position: sticky; top: 0; z-index: 20;
+      background: #fff; border-bottom: 1px solid #E2E8F0;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      padding: 11px 22px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    #logo { display: flex; align-items: center; gap: 10px; }
+    #logo-icon {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 15px; font-weight: 700; flex-shrink: 0;
+    }
+    #logo-title { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #0F172A; }
+    #live-badge {
+      font-size: 8px; font-weight: 700; letter-spacing: 0.1em;
+      background: #DCFCE7; color: #15803D; border: 1px solid #86EFAC;
+      border-radius: 3px; padding: 1px 5px; animation: blink 2s infinite;
+    }
+    #logo-sub { font-size: 9px; color: #94A3B8; margin-top: 1px; }
+
+    #controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    #meta { font-size: 10px; color: #94A3B8; }
+    #meta b { color: #475569; }
+
+    /* Countdown ring */
+    #ring-wrap { position: relative; width: 32px; height: 32px; flex-shrink: 0; }
+    #ring-wrap svg { position: absolute; transform: rotate(-90deg); }
+    #ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: #94A3B8; }
+
+    #refresh-btn {
+      background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; color: #2563EB;
+      padding: 5px 12px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+      cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 4px; transition: opacity 0.15s;
+    }
+    #refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #refresh-btn .spin { display: inline-block; }
+    #refresh-btn.loading .spin { animation: spin 0.8s linear infinite; }
+
+    /* SOURCE LEGEND */
+    #source-bar {
+      padding: 6px 22px; background: #F1F5F9; border-bottom: 1px solid #E2E8F0;
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    }
+    .src-chip {
+      font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+      border: 1px solid; cursor: pointer; transition: all 0.12s; font-family: inherit;
+      letter-spacing: 0.03em;
+    }
+
+    /* TAG FILTER */
+    #tag-bar {
+      padding: 7px 22px; background: #fff; border-bottom: 1px solid #F1F5F9;
+      display: flex; gap: 5px; flex-wrap: wrap;
+    }
+    .tag-btn {
+      font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 99px;
+      font-family: inherit; cursor: pointer; border: 1px solid #E2E8F0;
+      background: transparent; color: #94A3B8; transition: all 0.12s;
+    }
+    .tag-btn.active { font-weight: 700; }
+
+    /* STATS BAR */
+    #stats-bar {
+      padding: 6px 22px; background: #FAFAFA; border-bottom: 1px solid #F1F5F9;
+      display: flex; align-items: center; gap: 16px; font-size: 10px; color: #94A3B8;
+    }
+    #stats-bar b { color: #334155; }
+    #stats-bar .dot { color: #CBD5E1; }
+
+    /* FEED */
+    #feed { max-width: 980px; }
+    .news-row {
+      display: flex; align-items: baseline; gap: 10px;
+      padding: 9px 22px; border-bottom: 1px solid #F1F5F9;
+      text-decoration: none; color: inherit; transition: background 0.1s;
+      animation: fadeIn 0.3s ease both;
+    }
+    .news-row:hover { background: #F8FAFC; }
+    .row-num { font-size: 10px; color: #CBD5E1; font-weight: 600; min-width: 20px; text-align: right; flex-shrink: 0; padding-top: 1px; }
+    .row-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; }
+    .row-src { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
+    .row-title { font-size: 13px; font-family: 'Noto Sans KR', sans-serif; font-weight: 500; line-height: 1.45; flex: 1; color: #1E293B; }
+    .row-time { font-size: 10px; color: #94A3B8; white-space: nowrap; flex-shrink: 0; font-family: monospace; }
+
+    /* Skeleton */
+    .sk-row { display: flex; align-items: center; gap: 10px; padding: 9px 22px; border-bottom: 1px solid #F1F5F9; }
+    .sk { background: #EEF2F7; border-radius: 4px; animation: shimmer 1.4s infinite; }
+
+    /* Error / empty */
+    .msg-box { margin: 24px 22px; padding: 14px 18px; border-radius: 8px; font-size: 12px; font-family: 'Noto Sans KR', sans-serif; }
+    .msg-warn { background: #FFF7ED; border: 1px solid #FED7AA; color: #C2410C; }
+    .msg-empty { background: #F8FAFC; border: 1px solid #E2E8F0; color: #94A3B8; text-align: center; padding: 36px; }
+
+    #footer { text-align: center; padding: 18px 0 28px; font-size: 9px; color: #CBD5E1; letter-spacing: 0.08em; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes shimmer { 0%,100% { background-color: #EEF2F7; } 50% { background-color: #E2E8F0; } }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div id="logo">
+    <div id="logo-icon">₿</div>
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="logo-title">JB 디지털자산부</span>
+        <span id="live-badge">● LIVE</span>
+      </div>
+      <div id="logo-sub">최근 24시간 뉴스 · 블록미디어 · 토큰포스트 · 블록체인투데이 · 블루밍비트 · 코인텔레그래프 · 디지털애셋</div>
+    </div>
+  </div>
+  <div id="controls">
+    <div id="meta" style="display:none">총 <b id="total-count">0</b>건 &nbsp;·&nbsp; <b id="last-updated">—</b></div>
+    <div id="ring-wrap">
+      <svg width="32" height="32" viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r="13" fill="none" stroke="#F1F5F9" stroke-width="2.5"/>
+        <circle id="ring-circle" cx="16" cy="16" r="13" fill="none" stroke="#2563EB" stroke-width="2.5"
+          stroke-dasharray="81.68" stroke-dashoffset="0" style="transition:stroke-dashoffset 1s linear"/>
+      </svg>
+      <div id="ring-label">—</div>
+    </div>
+    <button id="refresh-btn" onclick="doLoad()"><span class="spin">⟳</span> 새로고침</button>
+  </div>
+</div>
+
+<div id="source-bar"></div>
+<div id="tag-bar"></div>
+<div id="stats-bar" style="display:none"></div>
+<div id="feed"></div>
+<div id="footer">JB DIGITAL ASSET DIVISION · 최근 24시간 · AUTO-REFRESH 3MIN</div>
+
+<script>
+const REFRESH = 180;
+const CIRC = 2 * Math.PI * 13; // 81.68
+
+// ─── Sources ────────────────────────────────────────────────────────────────
+// Each source: { id, name, color (bg/text/border), urls: [{url, tag}] }
+const SOURCES = [
+
+  {
+    id: "blockmedia",
+    name: "블록미디어",
+    bg: "#F3E8FF", text: "#7E22CE", border: "#D8B4FE",
+    urls: [
+      { url: "https://www.blockmedia.co.kr/feed", tag: "auto" },
+      { url: "https://www.blockmedia.co.kr/feed/", tag: "auto" },
+    ]
+  },
+  {
+    id: "tokenpost",
+    name: "토큰포스트",
+    bg: "#FEF3C7", text: "#92400E", border: "#FCD34D",
+    urls: [
+      { url: "https://www.tokenpost.kr/rss", tag: "auto" },
+      { url: "https://www.tokenpost.kr/feed", tag: "auto" },
+    ]
+  },
+  {
+    id: "blockchaintoday",
+    name: "블록체인투데이",
+    bg: "#D1FAE5", text: "#065F46", border: "#6EE7B7",
+    urls: [
+      { url: "https://www.blockchaintoday.co.kr/rss/allArticle.xml", tag: "auto" },
+      { url: "https://www.blockchaintoday.co.kr/feed", tag: "auto" },
+    ]
+  },
+  {
+    id: "bloomingbit",
+    name: "블루밍비트",
+    bg: "#FCE7F3", text: "#9D174D", border: "#F9A8D4",
+    urls: [
+      { url: "https://bloomingbit.io/rss.xml", tag: "auto" },
+    ]
+  },
+  {
+    id: "cointelegraph_kr",
+    name: "코인텔레그래프",
+    bg: "#FEF9C3", text: "#854D0E", border: "#FDE047",
+    urls: [
+      { url: "https://kr.cointelegraph.com/rss", tag: "auto" },
+      { url: "https://cointelegraph.com/rss", tag: "auto" },
+    ]
+  },
+
+  {
+    id: "digitalasset",
+    name: "디지털애셋",
+    bg: "#E0F2FE", text: "#075985", border: "#7DD3FC",
+    urls: [
+      { url: "https://www.digitalasset.works/rss/allArticle.xml", tag: "auto" },
+      { url: "https://www.digitalasset.works/rss/rss.xml", tag: "auto" },
+      { url: "https://www.digitalasset.works/rss", tag: "auto" },
+    ]
+  },
+
+];
+
+const TAG_COLORS = {
+  "규제":        { bg:"#FEF3C7", text:"#92400E", border:"#FCD34D" },
+  "기관":        { bg:"#EDE9FE", text:"#5B21B6", border:"#C4B5FD" },
+  "스테이블코인": { bg:"#D1FAE5", text:"#065F46", border:"#6EE7B7" },
+  "토큰화":      { bg:"#DBEAFE", text:"#1E40AF", border:"#93C5FD" },
+  "지갑":        { bg:"#FCE7F3", text:"#9D174D", border:"#F9A8D4" },
+  "기타":        { bg:"#F1F5F9", text:"#475569", border:"#CBD5E1" },
+};
+
+// Keywords → tag auto-detection
+const TAG_KEYWORDS = {
+  "규제":        /규제|금융위|금감원|법안|입법|정책|허가|제재|금지|트래블룰|VASP|FIU|과세|세금|내부통제|라이선스|인가/,
+  "기관":        /은행|증권사|미래에셋|삼성|KB|하나금융|신한|코빗|업비트|빗썸|거래소|기관투자|코인원|기업|법인|펀드|자산운용/,
+  "스테이블코인": /스테이블코인|USDT|USDC|USD1|원화스테이블|달러연동|페깅|stablecoin/i,
+  "토큰화":      /토큰화|토큰증권|STO|RWA|실물자산|조각투자|토크나이제이션|tokeniz/i,
+  "지갑":        /지갑|wallet|콜드월렛|하드웨어지갑|수탁|커스터디|custody|키관리|개인키|자기수탁/i,
+};
+
+function autoTag(title) {
+  for (const [tag, re] of Object.entries(TAG_KEYWORDS)) {
+    if (re.test(title)) return tag;
+  }
+  return "기타";
+}
+
+const PROXIES = [
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+// ─── State ──────────────────────────────────────────────────────────────────
+let allArticles = [];
+let activeTag = "전체";
+let activeSrc = "전체";
+let countdown = REFRESH;
+let busy = false;
+let timerRef = null;
+
+// ─── Utils ──────────────────────────────────────────────────────────────────
+function decodeHtml(t = "") {
+  return t
+    .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1")
+    .replace(/<[^>]+>/g,"").trim();
+}
+
+function parsePubDate(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function timeAgo(date) {
+  if (!date) return "";
+  const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diff < 0) return "";
+  if (diff < 60) return diff + "분 전";
+  if (diff < 1440) return Math.floor(diff/60) + "시간 전";
+  return Math.floor(diff/1440) + "일 전";
+}
+
+function isWithin24h(date) {
+  if (!date) return false; // exclude articles with no date
+  return (Date.now() - date.getTime()) < 24 * 60 * 60 * 1000;
+}
+
+function parseXML(xmlText, source, defaultTag) {
+  try {
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    const items = Array.from(doc.querySelectorAll("item"));
+    const results = [];
+    for (const item of items) {
+      const title = decodeHtml(item.querySelector("title")?.textContent || "");
+      if (!title || title.length < 5) continue;
+
+      // Link — Google RSS puts it as a text node AFTER <link>
+      let link = "";
+      const linkEl = item.querySelector("link");
+      if (linkEl) link = (linkEl.nextSibling?.nodeValue?.trim()) || linkEl.textContent?.trim() || "";
+
+      const pubDate = parsePubDate(item.querySelector("pubDate")?.textContent);
+      if (!isWithin24h(pubDate)) continue;   // ← 24h filter
+
+      const srcEl = item.querySelector("source");
+      const srcName = srcEl ? decodeHtml(srcEl.textContent) : source.name;
+
+      const tag = defaultTag === "auto" ? autoTag(title) : defaultTag;
+
+      results.push({ title, link, date: pubDate, time: timeAgo(pubDate), source: srcName, srcId: source.id, tag });
+    }
+    return results;
+  } catch(e) { return []; }
+}
+
+async function fetchUrl(rawUrl, source, tag) {
+  for (const makeProxy of PROXIES) {
+    try {
+      const proxyUrl = makeProxy(rawUrl);
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) continue;
+      let xml = "";
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("json") || proxyUrl.includes("allorigins")) {
+        const j = await res.json(); xml = j.contents || j.data || "";
+      } else { xml = await res.text(); }
+      if (!xml || !xml.includes("<item>")) continue;
+      const articles = parseXML(xml, source, tag);
+      if (articles.length > 0) return articles;
+    } catch(e) { /* next proxy */ }
+  }
+  return [];
+}
+
+async function fetchSource(source) {
+  for (const { url, tag } of source.urls) {
+    const articles = await fetchUrl(url, source, tag);
+    if (articles.length > 0) return articles;
+  }
+  return [];
+}
+
+async function fetchAll() {
+  const results = await Promise.allSettled(SOURCES.map(s => fetchSource(s)));
+  const all = [];
+  results.forEach(r => { if (r.status === "fulfilled") all.push(...r.value); });
+
+  // Deduplicate by title prefix
+  const seen = new Set();
+  return all
+    .filter(a => {
+      const k = a.title.replace(/\s+/g,"").slice(0,18);
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    })
+    .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+}
+
+// ─── Render ─────────────────────────────────────────────────────────────────
+function srcColor(id) {
+  return SOURCES.find(s => s.id === id) || { bg:"#F1F5F9", text:"#475569", border:"#CBD5E1" };
+}
+
+function renderSourceBar() {
+  const bar = document.getElementById("source-bar");
+  const srcIds = ["전체", ...SOURCES.map(s => s.id)];
+  bar.innerHTML = srcIds.map(id => {
+    const src = id === "전체" ? null : SOURCES.find(s => s.id === id);
+    const count = id === "전체" ? allArticles.length : allArticles.filter(a => a.srcId === id).length;
+    const isActive = activeSrc === id;
+    const bg   = isActive ? (src?.bg   || "#E2E8F0") : "#fff";
+    const text = isActive ? (src?.text || "#334155") : "#94A3B8";
+    const bord = isActive ? (src?.border || "#CBD5E1") : "#E2E8F0";
+    const label = src ? src.name : "전체";
+    return `<button class="src-chip" style="background:${bg};color:${text};border-color:${bord};"
+      onclick="setSrc('${id}')">${label}${count>0?' '+count:''}</button>`;
+  }).join("");
+}
+
+function renderTagBar() {
+  const bar = document.getElementById("tag-bar");
+  const tags = ["전체", ...Object.keys(TAG_COLORS)];
+  bar.innerHTML = tags.map(tag => {
+    const pool = activeSrc === "전체" ? allArticles : allArticles.filter(a => a.srcId === activeSrc);
+    const count = tag === "전체" ? pool.length : pool.filter(a => a.tag === tag).length;
+    const isActive = activeTag === tag;
+    const c = TAG_COLORS[tag];
+    let style = "";
+    if (isActive && c) style = `background:${c.bg};color:${c.text};border-color:${c.border};font-weight:700;`;
+    else if (isActive) style = "background:#F1F5F9;color:#334155;border-color:#CBD5E1;font-weight:700;";
+    return `<button class="tag-btn${isActive?' active':''}" style="${style}" onclick="setTag('${tag}')">${tag}${count>0?' '+count:''}</button>`;
+  }).join("");
+}
+
+function filtered() {
+  let pool = allArticles;
+  if (activeSrc !== "전체") pool = pool.filter(a => a.srcId === activeSrc);
+  if (activeTag !== "전체") pool = pool.filter(a => a.tag === activeTag);
+  return pool;
+}
+
+function renderStats() {
+  const sb = document.getElementById("stats-bar");
+  if (allArticles.length === 0) { sb.style.display = "none"; return; }
+  sb.style.display = "flex";
+  const pool = filtered();
+  sb.innerHTML = `<span>표시 <b>${pool.length}</b>건</span><span class="dot">·</span>최근 24시간 뉴스만 표시`;
+}
+
+function renderFeed() {
+  const feed = document.getElementById("feed");
+  const pool = filtered();
+  if (pool.length === 0) {
+    feed.innerHTML = `<div class="msg-box msg-empty">최근 24시간 내 해당 조건의 기사가 없습니다</div>`;
+    return;
+  }
+  const src = SOURCES.find(s => s.id === activeSrc);
+  feed.innerHTML = pool.map((a, i) => {
+    const tc = TAG_COLORS[a.tag] || TAG_COLORS["기타"];
+    const sc = SOURCES.find(s => s.id === a.srcId);
+    return `<a class="news-row" href="${a.link||'#'}" target="_blank" rel="noopener noreferrer"
+        style="animation-delay:${Math.min(i*0.025,0.5)}s">
+      <span class="row-num">${i+1}</span>
+      <span class="row-tag" style="background:${tc.bg};color:${tc.text};border:1px solid ${tc.border}">${a.tag}</span>
+      <span class="row-src" style="background:${sc?.bg||'#F1F5F9'};color:${sc?.text||'#475569'};border:1px solid ${sc?.border||'#E2E8F0'}">${a.source}</span>
+      <span class="row-title">${a.title}</span>
+      <span class="row-time">${a.time}</span>
+    </a>`;
+  }).join("");
+}
+
+function showSkeletons() {
+  const feed = document.getElementById("feed");
+  feed.innerHTML = Array.from({length:14}).map((_,i)=>`
+    <div class="sk-row">
+      <div class="sk" style="width:18px;height:10px;flex-shrink:0"></div>
+      <div class="sk" style="width:44px;height:17px;border-radius:99px;flex-shrink:0"></div>
+      <div class="sk" style="width:56px;height:17px;border-radius:3px;flex-shrink:0"></div>
+      <div class="sk" style="height:13px;flex:1;max-width:${55+(i%5)*9}%"></div>
+      <div class="sk" style="width:52px;height:10px;flex-shrink:0"></div>
+    </div>`).join("");
+}
+
+function updateRing() {
+  const pct = countdown / REFRESH;
+  document.getElementById("ring-circle").style.strokeDashoffset = CIRC * (1 - pct);
+  document.getElementById("ring-label").textContent = countdown;
+}
+
+function setTag(tag) { activeTag = tag; renderTagBar(); renderStats(); renderFeed(); }
+function setSrc(id)  { activeSrc = id; activeTag = "전체"; renderSourceBar(); renderTagBar(); renderStats(); renderFeed(); }
+
+// ─── Load ────────────────────────────────────────────────────────────────────
+async function doLoad() {
+  if (busy) return;
+  busy = true;
+  document.getElementById("refresh-btn").disabled = true;
+  document.getElementById("refresh-btn").classList.add("loading");
+  showSkeletons();
+  try {
+    const data = await fetchAll();
+    allArticles = data;
+    document.getElementById("meta").style.display = "";
+    document.getElementById("total-count").textContent = allArticles.length;
+    const n = new Date();
+    document.getElementById("last-updated").textContent =
+      n.getHours()+":"+String(n.getMinutes()).padStart(2,"0")+":"+String(n.getSeconds()).padStart(2,"0");
+    if (allArticles.length === 0) {
+      document.getElementById("feed").innerHTML = `<div class="msg-box msg-warn">⚠️ 기사를 불러오지 못했습니다. CORS 프록시가 일시적으로 제한될 수 있습니다. 잠시 후 자동 재시도됩니다.</div>`;
+    } else {
+      renderSourceBar(); renderTagBar(); renderStats(); renderFeed();
+    }
+  } catch(e) {
+    document.getElementById("feed").innerHTML = `<div class="msg-box msg-warn">⚠️ ${e.message}</div>`;
+  } finally {
+    busy = false;
+    document.getElementById("refresh-btn").disabled = false;
+    document.getElementById("refresh-btn").classList.remove("loading");
+    countdown = REFRESH; updateRing();
+  }
+}
+
+function startTimer() {
+  if (timerRef) clearInterval(timerRef);
+  timerRef = setInterval(()=>{ countdown--; updateRing(); if(countdown<=0){countdown=REFRESH;doLoad();} }, 1000);
+}
+
+// Init
+renderSourceBar();
+renderTagBar();
+doLoad();
+startTimer();
+</script>
+</body>
+</html>
